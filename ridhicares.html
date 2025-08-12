@@ -1,0 +1,282 @@
+<!--
+Place this single file and the two images in the same folder on your host.
+Rename your uploads to: photo1.jpg  and  photo2.jpg
+Files structure:
+- index.html  (this file)
+- photo1.jpg
+- photo2.jpg
+
+Open index.html in a browser to preview. Upload these files to your host and point your domain to the folder.
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>For You — A Little Surprise</title>
+  <style>
+    :root{
+      --bg:#07060a;
+      --panel:#0f0f13;
+      --accent:#ff3966;
+      --soft:#ffdfe6;
+      --glass: rgba(255,255,255,0.03);
+      --cursor-size:24px;
+      --max-width:1100px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, 'Helvetica Neue', Arial;
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; background:radial-gradient(1200px 600px at 10% 10%, #0f0e12 0%, var(--bg) 30%);
+      color:#fff; overflow-x:hidden; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* === heart cursor (desktop only) === */
+    @media (pointer: fine){
+      body{ cursor:none; }
+      .heart-cursor{ position:fixed; pointer-events:none; width:var(--cursor-size); height:var(--cursor-size); transform:translate(-50%,-50%); transition:transform .06s linear; z-index:9999; }
+      .heart-cursor svg{ width:100%; height:100%; }
+    }
+
+    /* layout */
+    main{ min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+
+    /* canvas starry background full screen */
+    #bgCanvas{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+    /* stage */
+    .hero{ width:100%; min-height:88vh; display:flex; align-items:center; justify-content:center; position:relative; z-index:2; padding:6vh 4vw; }
+    .container{ width:min(var(--max-width),96%); max-width:var(--max-width); }
+
+    /* envelope - using SVG for shape */
+    .envelope-wrap{ display:flex; align-items:center; justify-content:center; }
+    .envelope-cta{ width:100%; max-width:920px; aspect-ratio:16/7; position:relative; }
+    .env-outer{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+    .env-surface{ width:94%; height:86%; border-radius:14px; background:linear-gradient(180deg,#fff 0%, #f7eef0 100%); box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 -6px 18px rgba(0,0,0,0.06); overflow:visible; display:flex; align-items:center; justify-content:center; transform-style:preserve-3d; }
+
+    /* paper grain texture via overlay */
+    .env-surface:after{ content:''; position:absolute; inset:0; background-image: radial-gradient(rgba(0,0,0,0.02) 1px, transparent 1px); background-size:6px 6px; mix-blend-mode:overlay; opacity:.12; pointer-events:none; border-radius:12px; }
+
+    /* flap - separate for 3d rotation */
+    .env-flap{ position:absolute; top:-2%; left:3%; right:3%; height:44%; transform-origin:center top; transform-style:preserve-3d; transition: transform 950ms cubic-bezier(.2,.9,.23,1), box-shadow 400ms; z-index:10; }
+    .env-flap .flap-shape{ width:100%; height:100%; border-radius:10px 10px 6px 6px; background:linear-gradient(180deg,#fff8f9 0%, #f1e2e4 100%); box-shadow: 0 18px 40px rgba(0,0,0,0.45); display:flex; align-items:flex-start; justify-content:center; position:relative; overflow:hidden; }
+    /* curved edge using pseudo */
+    .env-flap .flap-shape:before{ content:''; position:absolute; left:50%; transform:translateX(-50%); bottom:-8px; width:110%; height:40px; background:radial-gradient(ellipse at center, rgba(0,0,0,0.06), transparent 60%); border-radius:50%; }
+
+    /* shadow layer under flap to create realism */
+    .env-shadow{ position:absolute; top:28%; left:8%; right:8%; height:10%; background:linear-gradient(180deg, rgba(0,0,0,0.28), transparent); border-radius:8px; filter:blur(12px); z-index:5; opacity:0.95; }
+
+    /* when opened */
+    .env-open .env-flap{ transform: rotateX(180deg) translateY(-6%); box-shadow: 0 40px 80px rgba(0,0,0,0.5); }
+    .env-open .env-shadow{ opacity:0; transform:translateY(-12px); transition: transform 700ms, opacity 450ms; }
+
+    /* inner photo area (panel) */
+    .photo-panel{ position:relative; width:88%; height:64%; border-radius:10px; overflow:hidden; transform-style:preserve-3d; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+    .photo-slide{ position:absolute; inset:0; background-size:cover; background-position:center; transition:opacity 1s ease, transform 650ms ease; opacity:0; }
+    .photo-slide.show{ opacity:1; }
+    .photo-slide.parallax{ transform:translate3d(0,0,0); }
+
+    /* pulsing invite */
+    .envelope-cta .pulse-ring{ position:absolute; inset:0; border-radius:14px; pointer-events:none; }
+    .pulse-ring::after{ content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:54%; height:44%; border-radius:12px; box-shadow:0 0 0 0 rgba(255,57,102,0.14); animation:envPulse 2.6s infinite; }
+    @keyframes envPulse{ 0%{ box-shadow:0 0 0 0 rgba(255,57,102,0.14);} 70%{ box-shadow:0 0 0 48px rgba(255,57,102,0);} 100%{ box-shadow:0 0 0 0 rgba(255,57,102,0);} }
+
+    /* hint */
+    .hint{ position:absolute; bottom:8px; left:50%; transform:translateX(-50%); font-size:14px; color:#ffe; opacity:.95; background:var(--glass); padding:8px 12px; border-radius:999px; backdrop-filter: blur(6px); box-shadow:0 6px 20px rgba(0,0,0,.45); z-index:60; }
+
+    /* floating hearts across whole viewport */
+    .floating-wrap{ position:fixed; left:0; top:0; right:0; bottom:0; pointer-events:none; overflow:visible; z-index:30; }
+    .heart{ position:absolute; bottom:-6%; width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; transform:translateY(0); opacity:0.95; background:linear-gradient(180deg,#ff7b93,#ff3b69); box-shadow:0 10px 30px rgba(0,0,0,.45); pointer-events:auto; }
+    .heart svg{ width:60%; height:60%; filter:drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+    .tooltip{ position:absolute; bottom:62px; left:50%; transform:translateX(-50%) translateY(6px); background:rgba(0,0,0,0.7); color:#fff; padding:8px 12px; border-radius:10px; font-size:13px; white-space:nowrap; opacity:0; transition:opacity .18s, transform .18s; pointer-events:none; }
+    .heart:hover .tooltip, .heart.show .tooltip{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* message section */
+    .message-section{ width:100%; padding:120px 4vw; display:flex; align-items:center; justify-content:center; min-height:60vh; z-index:2; }
+    .message-card{ width:min(900px,96%); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:14px; padding:40px; box-shadow: 0 18px 40px rgba(0,0,0,.6); }
+    .message{ font-size:20px; line-height:1.6; color:#ffecec; white-space:pre-wrap; font-family: 'Georgia', serif; min-height:160px; }
+    .cursor{ display:inline-block; width:12px; height:24px; background:#fff; margin-left:6px; opacity:0.95; animation:blink 1s steps(2) infinite; vertical-align:bottom; }
+    @keyframes blink{ 50%{ opacity:0 } }
+
+    .cta{ margin-top:20px; display:flex; justify-content:center; }
+    .btn{ background:linear-gradient(90deg,var(--accent),#ff6a88); color:#111; padding:12px 18px; border-radius:999px; font-weight:700; text-decoration:none; box-shadow:0 12px 30px rgba(255,57,102,0.14); }
+
+    /* responsive tweaks */
+    @media (max-width:760px){ .env-flap{ height:46%; top:-1%; } .photo-panel{ height:62%; } .heart{ width:36px; height:36px } .message-section{ padding:80px 4vw } }
+  </style>
+</head>
+<body>
+
+  <canvas id="bgCanvas" aria-hidden="true"></canvas>
+
+  <div class="heart-cursor" id="heartCursor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-6.716-4.35-9.226-7.13C-1.957 8.38 3.657 2.5 7.5 5.5 9.5 7 11 9 12 9s2.5-2 4.5-3.5C20.343 2.5 26 8.38 21.226 13.87 18.716 16.65 12 21 12 21z" fill="#ff3966"/></svg>
+  </div>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="envelope-wrap">
+          <div class="envelope-cta" id="envelopeCta" role="button" tabindex="0" aria-label="Open envelope">
+
+            <div class="env-outer">
+              <div class="env-surface" id="envSurface">
+                <div class="env-shadow" aria-hidden="true"></div>
+
+                <div class="env-flap" id="envFlap" aria-hidden="true">
+                  <div class="flap-shape"></div>
+                </div>
+
+                <div class="photo-panel" id="photoPanel">
+                  <div class="photo-slide" id="slide1" style="background-image:url('photo1.jpg')"></div>
+                  <div class="photo-slide" id="slide2" style="background-image:url('photo2.jpg')"></div>
+                </div>
+
+              </div>
+            </div>
+
+            <div class="pulse-ring" aria-hidden="true"></div>
+            <div class="hint" id="hint">Click to open &nbsp;→</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="message-section" id="messageSection">
+      <div class="message-card">
+        <div class="message" id="typewriter"></div>
+        <div class="cta">
+          <a class="btn" id="textMe" href="https://t.me/ridhiaggarwal" target="_blank" rel="noopener">Text Me</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="floating-wrap" id="floatingWrap" aria-hidden="true"></div>
+
+  <script>
+    /* ================== helper & cursor ================== */
+    const heartCursor = document.getElementById('heartCursor');
+    let supportsFine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+    if(!supportsFine){ heartCursor.style.display='none'; }
+    else{ document.addEventListener('mousemove', e=>{ heartCursor.style.left = e.clientX + 'px'; heartCursor.style.top = e.clientY + 'px'; }); }
+
+    /* ================ background starry heart particles with parallax ================ */
+    const bgCanvas = document.getElementById('bgCanvas');
+    const bgCtx = bgCanvas.getContext('2d');
+    let DPR = Math.max(1, window.devicePixelRatio || 1);
+    function resizeBg(){ bgCanvas.width = innerWidth * DPR; bgCanvas.height = innerHeight * DPR; bgCanvas.style.width = innerWidth + 'px'; bgCanvas.style.height = innerHeight + 'px'; bgCtx.setTransform(DPR,0,0,DPR,0,0); }
+    window.addEventListener('resize', resizeBg, {passive:true}); resizeBg();
+
+    // create particles (hearts + small stars)
+    const particles = [];
+    const STAR_COUNT = Math.floor(Math.max(innerWidth,innerHeight)/14);
+    const colors = ['#ffdfe6','#ffc1d6','#ff8aa3','#ff5b7e'];
+    function rnd(min,max){ return Math.random()*(max-min)+min; }
+    function createParticles(){ particles.length=0; for(let i=0;i<STAR_COUNT;i++){ particles.push({ x: Math.random()*innerWidth, y: Math.random()*innerHeight, size: rnd(0.6,2.4), type: Math.random()<0.18? 'heart':'star', hue: colors[Math.floor(Math.random()*colors.length)], ox:0, oy:0 }); } }
+    createParticles();
+
+    let mouse = {x: innerWidth/2, y: innerHeight/2};
+    window.addEventListener('mousemove', (e)=>{ mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    function drawHeart(ctx,x,y,s,fill){ ctx.save(); ctx.translate(x,y); ctx.beginPath(); const k = s/12; ctx.moveTo(0,-4*k); ctx.bezierCurveTo(6*k,-18*k,24*k,-6*k,0,14*k); ctx.bezierCurveTo(-24*k,-6*k,-6*k,-18*k,0,-4*k); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.restore(); }
+
+    function renderBg(){ bgCtx.clearRect(0,0,innerWidth,innerHeight);
+      // parallax offset based on mouse
+      const cx = (mouse.x - innerWidth/2)/innerWidth; const cy = (mouse.y - innerHeight/2)/innerHeight;
+      // connecting subtle lines
+      bgCtx.globalAlpha = 0.09;
+      for(let i=0;i<particles.length;i++){ const p = particles[i]; const parx = (p.x - cx*40); const pary = (p.y - cy*30);
+        if(p.type==='star'){ bgCtx.fillStyle = p.hue; bgCtx.beginPath(); bgCtx.arc(parx,pary,p.size,0,Math.PI*2); bgCtx.fill(); }
+        else{ drawHeart(bgCtx, parx, pary, p.size*6, p.hue); }
+      }
+      // subtle connecting lines between nearby small stars
+      bgCtx.lineWidth = 0.6; bgCtx.strokeStyle = 'rgba(255,230,235,0.06)';
+      for(let i=0;i<particles.length;i++){ for(let j=i+1;j<particles.length;j++){ const a=particles[i], b=particles[j]; const dx = a.x - b.x, dy = a.y - b.y; const d = Math.sqrt(dx*dx+dy*dy); if(d<120){ bgCtx.beginPath(); bgCtx.moveTo(a.x - cx*8, a.y - cy*6); bgCtx.lineTo(b.x - cx*8, b.y - cy*6); bgCtx.stroke(); } } }
+    }
+    function loopBg(){ renderBg(); requestAnimationFrame(loopBg); }
+    loopBg();
+
+    /* ================ floating heart-notes across full viewport ================ */
+    const floatingWrap = document.getElementById('floatingWrap');
+    const notes = ["I love you","you are the best","you+me=perfect","my pyara chikna","my favourite laugh","forever and ever"];
+    function spawnHeart(){ const el = document.createElement('div'); el.className='heart';
+      const size = Math.random()*18 + 30; el.style.width = size+'px'; el.style.height = size+'px';
+      const left = Math.random()*98; el.style.left = left+'%'; el.style.bottom = (-8 - Math.random()*8) + '%'; el.style.opacity = 0.75 + Math.random()*0.25;
+      const svg = `<svg viewBox='0 0 24 24'><path d='M12 21s-6.716-4.35-9.226-7.13C-1.957 8.38 3.657 2.5 7.5 5.5 9.5 7 11 9 12 9s2.5-2 4.5-3.5C20.343 2.5 26 8.38 21.226 13.87 18.716 16.65 12 21 12 21z' fill='white'/></svg>`;
+      el.innerHTML = svg;
+      const tt = document.createElement('div'); tt.className='tooltip'; tt.textContent = notes[Math.floor(Math.random()*notes.length)]; el.appendChild(tt);
+      // hover/tap
+      el.addEventListener('mouseenter', ()=> el.classList.add('show'));
+      el.addEventListener('mouseleave', ()=> el.classList.remove('show'));
+      el.addEventListener('touchstart', (ev)=>{ ev.stopPropagation(); el.classList.toggle('show'); });
+      floatingWrap.appendChild(el);
+      const duration = 10000 + Math.random()*16000; const start = performance.now(); const startLeft = parseFloat(left);
+      (function animate(now){ const t = (now - start)/duration; if(t>1){ el.remove(); return; }
+        // move in all directions (drift) while rising
+        const y = t * (innerHeight*1.25);
+        const x = (startLeft/100)*innerWidth + Math.sin(t*7 + start)*60 * (Math.random()*0.6+0.6);
+        el.style.transform = `translate3d(${x - (startLeft/100)*innerWidth}px, ${-y}px, 0)`;
+        requestAnimationFrame(animate);
+      })(start);
+    }
+    // spawn frequently across viewport
+    for(let i=0;i<10;i++) setTimeout(spawnHeart, i*600);
+    setInterval(()=> spawnHeart(), 1500);
+
+    /* ================ envelope open + photo reveal with crossfade + parallax ================ */
+    const envelopeCta = document.getElementById('envelopeCta');
+    const envFlap = document.getElementById('envFlap');
+    const photoPanel = document.getElementById('photoPanel');
+    const slide1 = document.getElementById('slide1');
+    const slide2 = document.getElementById('slide2');
+    let opened = false;
+
+    // photo loop
+    let current = 0; const slides = [slide1, slide2];
+    function showSlide(i){ slides.forEach((s,idx)=>{ s.classList.toggle('show', idx===i); s.style.transform = 'translate3d(0,0,0)'; }); }
+    showSlide(0);
+    let slideTimer = setInterval(()=>{ current = (current+1)%slides.length; showSlide(current); }, 6000);
+
+    function openEnvelope(){ if(opened) return; opened=true; document.body.classList.add('env-open'); envelopeCta.classList.add('env-open'); envFlap.style.transform = 'rotateX(180deg) translateY(-6%)'; envFlap.style.transition = 'transform 950ms cubic-bezier(.2,.9,.23,1)'; // confetti!
+      doConfetti(); // enlarge panel slightly
+      setTimeout(()=>{ photoPanel.style.transform = 'scale(1.02)'; clearInterval(slideTimer); // keep current slide visible full-screen effect
+        slides.forEach(s=> s.classList.add('parallax'));
+      }, 750);
+      // hide hint
+      const hint = document.getElementById('hint'); if(hint) hint.style.opacity=0;
+    }
+    envelopeCta.addEventListener('click', openEnvelope);
+    envelopeCta.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' ') openEnvelope(); });
+
+    // parallax photo follow mouse
+    document.addEventListener('mousemove', (e)=>{
+      if(!opened) return;
+      const cx = (e.clientX - innerWidth/2)/innerWidth; const cy = (e.clientY - innerHeight/2)/innerHeight;
+      slides.forEach((s, idx)=>{ const depth = idx===0? 12:6; s.style.transform = `translate3d(${cx*depth}px, ${cy*depth}px, 0)`; });
+    });
+
+    // simple confetti particles using canvas overlay
+    function doConfetti(){ const c = document.createElement('canvas'); c.style.position='absolute'; c.style.inset='0'; c.style.zIndex=999; c.style.pointerEvents='none'; envelopeCta.appendChild(c); c.width = envelopeCta.clientWidth; c.height = envelopeCta.clientHeight; const ctx = c.getContext('2d'); const pieces=[]; for(let i=0;i<120;i++){ pieces.push({ x:c.width/2, y:c.height/2, vx:(Math.random()-0.5)*10, vy:(Math.random()-6)*8 - 4, r:Math.random()*6+4, color: colors[Math.floor(Math.random()*colors.length)], rot:Math.random()*360 }); }
+      let t=0; const g=0.35; function step(){ ctx.clearRect(0,0,c.width,c.height); for(let p of pieces){ p.vy += g; p.x += p.vx; p.y += p.vy; p.rot += p.vx; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot* Math.PI/180); ctx.fillStyle = p.color; ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*0.6); ctx.restore(); } t++; if(t<160) requestAnimationFrame(step); else setTimeout(()=> c.remove(),400); } step(); }
+
+    /* ================ typewriter ending ================ */
+    const message = `Here's the drawing baby ji, a caricature, ab kuch khas chize aati jati to nhi mujhe, to belli bethi ne drawing hi kr di, aur aapki sari besti bhi ikhate kr di. aapko mene thoda sa budha, thoda sa chalak bna diya, muche rkh di kyuki chikna nhi rhne deta khudko isliy bohot sari muche, vo baat alag h mujhe ese bhi bdiya lgta h, par thoda sach ye bhi h ki koshish mene zada ki thi ki zada appropriate bnau, lekin fir skill issue aa jata h, but leaving everything aside, let me tell you one little thing, that I lovee youu sooo mucchhhh LAADI`;
+    const out = document.getElementById('typewriter'); let idx=0; let typing=false;
+    function typeStep(){ if(idx<=message.length){ out.textContent = message.slice(0,idx); idx++; setTimeout(typeStep, 22 + Math.random()*36); } }
+
+    const observer = new IntersectionObserver(entries=>{ entries.forEach(ent=>{ if(ent.isIntersecting && !typing){ typing=true; typeStep(); } }); }, { threshold: 0.33 });
+    observer.observe(document.getElementById('messageSection'));
+
+    /* ================ utilities ================ */
+    window.addEventListener('resize', ()=>{ // update counts & sizes
+      DPR = Math.max(1, window.devicePixelRatio || 1); resizeBg(); createParticles();
+    });
+
+    /* quick image fallback check */
+    ["photo1.jpg","photo2.jpg"].forEach(src=>{ const i=new Image(); i.src=src; i.onerror=()=> console.warn('Missing image',src); });
+
+  </script>
+</body>
+</html>
